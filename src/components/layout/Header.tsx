@@ -56,7 +56,7 @@ export const Header: React.FC = () => {
             <button
               onClick={() => refreshData()}
               disabled={state.isLoading}
-              className="flex items-center gap-2 px-4 py-2 bg-accent text-primary-dark rounded-lg hover:bg-accent-light transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 px-4 py-2 bg-accent text-primary-dark font-semibold rounded-lg border-2 border-white/40 shadow-lg hover:bg-accent-light hover:border-white transition-colors disabled:opacity-50"
             >
               <RefreshCw className={`w-4 h-4 ${state.isLoading ? 'animate-spin' : ''}`} />
               <span>刷新数据</span>
