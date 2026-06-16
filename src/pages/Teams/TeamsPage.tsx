@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { TEAMS } from '../../services/staticData';
-import { Search, Shield, TrendingUp } from 'lucide-react';
+import { getRating } from '../../services/teamRatings';
+import { useApp } from '../../context/AppContext';
+import { Search, Shield, TrendingUp, BarChart3 } from 'lucide-react';
 
 export const TeamsPage: React.FC = () => {
+  const { state } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGroup, setSelectedGroup] = useState<string>('all');
 
@@ -78,7 +81,7 @@ export const TeamsPage: React.FC = () => {
                 <div className="text-sm text-gray-500">{team.name}</div>
               </div>
             </div>
-            <div className="mt-3 flex items-center gap-4 text-sm">
+            <div className="mt-3 flex items-center gap-4 text-sm flex-wrap">
               <div className="flex items-center gap-1">
                 <Shield className="w-4 h-4 text-primary" />
                 <span>{team.group ? `${team.group}组` : '淘汰赛'}</span>
@@ -86,6 +89,10 @@ export const TeamsPage: React.FC = () => {
               <div className="flex items-center gap-1">
                 <TrendingUp className="w-4 h-4 text-accent-dark" />
                 <span>FIFA排名: {team.fifaRank}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <BarChart3 className="w-4 h-4 text-success" />
+                <span>实时评分: {Math.round(getRating(state.teamRatings, team))}</span>
               </div>
             </div>
           </div>

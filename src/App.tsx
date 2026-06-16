@@ -2,18 +2,15 @@ import React, { useState } from 'react';
 import { AppProvider } from './context/AppContext';
 import { Header } from './components/layout/Header';
 import { Navigation } from './components/layout/Navigation';
-import { HomePage } from './pages/Home/HomePage';
 import { MatchesPage } from './pages/Matches/MatchesPage';
 import { TeamsPage } from './pages/Teams/TeamsPage';
 import { HistoryPage } from './pages/History/HistoryPage';
 
 const AppContent: React.FC = () => {
-  const [currentPage, setCurrentPage] = useState('home');
+  const [currentPage, setCurrentPage] = useState('matches');
 
   const renderPage = () => {
     switch (currentPage) {
-      case 'home':
-        return <HomePage />;
       case 'matches':
         return <MatchesPage />;
       case 'teams':
@@ -21,7 +18,7 @@ const AppContent: React.FC = () => {
       case 'history':
         return <HistoryPage />;
       default:
-        return <HomePage />;
+        return <MatchesPage />;
     }
   };
 

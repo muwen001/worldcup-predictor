@@ -1,4 +1,5 @@
 import type { Match, Prediction, MatchResult } from '../types';
+import type { TeamRatings } from './teamRatings';
 import {
   calculateEnhancedProbabilities,
   calculateEnhancedConfidence,
@@ -13,34 +14,27 @@ import {
 } from '../utils/oddsCalculator';
 
 export class PredictionEngine {
-  static predict(match: Match, useEnhanced: boolean = true): Prediction {
+  static predict(match: Match, teamRatings?: TeamRatings, useEnhanced: boolean = true): Prediction {
     const probabilities = useEnhanced
-      ? calculateEnhancedProbabilities(match.odds, match.homeTeam, match.awayTeam, match.stage)
+      ? calculateEnhancedProbabilities(match.odds, match.homeTeam, match.awayTeam, match.stage, teamRatings)
       : calculateWeightedProbabilities(match.odds);
 
-    let predictedOutcome: MatchResult;
-    if (probabilities.home >= probabilities.draw && probabilities.home >= probabilities.away) {
-      predictedOutcome = 'home';
-    } else if (probabilities.away >= probabilities.draw) {
-      predictedOutcome = 'away';
-    } else {
-      predictedOutcome = 'draw';
-    }
+    const predictedOutcome = this.selectOutcome(probabilities);
 
     const confidence = useEnhanced
-      ? calculateEnhancedConfidence(probabilities, match.odds, match.homeTeam, match.awayTeam, match.stage)
+      ? calculateEnhancedConfidence(probabilities, match.odds, match.homeTeam, match.awayTeam, match.stage, teamRatings)
       : calculateConfidence(probabilities, match.odds);
 
     const reasoning = useEnhanced
-      ? generateEnhancedReasoning(probabilities, match.odds, predictedOutcome, match.homeTeam, match.awayTeam, match.stage)
+      ? generateEnhancedReasoning(probabilities, match.odds, predictedOutcome, match.homeTeam, match.awayTeam, match.stage, teamRatings)
       : generateReasoning(probabilities, match.odds, predictedOutcome);
 
     const scorePredictions = useEnhanced
-      ? calculateEnhancedScorePredictions(probabilities, match.homeTeam, match.awayTeam, match.stage)
+      ? calculateEnhancedScorePredictions(probabilities, match.homeTeam, match.awayTeam, match.stage, teamRatings)
       : calculateScorePredictions(probabilities, match.homeTeam.fifaRank, match.awayTeam.fifaRank);
 
     const expectedGoals = useEnhanced
-      ? calculateEnhancedExpectedGoals(match.homeTeam, match.awayTeam, probabilities)
+      ? calculateEnhancedExpectedGoals(match.homeTeam, match.awayTeam, probabilities, match.stage, teamRatings)
       : calculateExpectedGoals(probabilities, match.homeTeam.fifaRank, match.awayTeam.fifaRank);
 
     return {
@@ -55,12 +49,36 @@ export class PredictionEngine {
     };
   }
 
-  static predictBatch(matches: Match[], useEnhanced: boolean = true): Prediction[] {
-    return matches.map((match) => this.predict(match, useEnhanced));
+  /**
+   * 智能选择预测结果：引入"平局窗口"机制
+   * 足球中平局概率很少是最高的，但当胜负概率非常接近（diff <= 15%）且平局概率足够高（>=22%）时，预测平局更合理
+   */
+  private static selectOutcome(
+    probabilities: { home: number; draw: number; away: number }
+  ): MatchResult {
+    const { home, draw, away } = probabilities;
+    const diff = Math.abs(home - away);
+
+    // 当胜负概率非常接近且平局概率足够高时，预测平局
+    const drawThreshold = 0.22;
+    const diffThreshold = 0.15;
+
+    if (draw >= drawThreshold && diff <= diffThreshold) {
+      return 'draw';
+    }
+
+    // 标准选择：概率最高的结果
+    if (home >= away && home >= draw) return 'home';
+    if (away >= home && away >= draw) return 'away';
+    return 'draw';
   }
 
-  static rePredict(match: Match, previousPrediction?: Prediction, useEnhanced: boolean = true): Prediction {
-    const newPrediction = this.predict(match, useEnhanced);
+  static predictBatch(matches: Match[], teamRatings?: TeamRatings, useEnhanced: boolean = true): Prediction[] {
+    return matches.map((match) => this.predict(match, teamRatings, useEnhanced));
+  }
+
+  static rePredict(match: Match, previousPrediction?: Prediction, teamRatings?: TeamRatings, useEnhanced: boolean = true): Prediction {
+    const newPrediction = this.predict(match, teamRatings, useEnhanced);
 
     if (previousPrediction && previousPrediction.predictedOutcome !== newPrediction.predictedOutcome) {
       newPrediction.reasoning.unshift(

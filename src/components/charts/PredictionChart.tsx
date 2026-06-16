@@ -28,7 +28,8 @@ export const PredictionChart: React.FC<PredictionChartProps> = ({ prediction }) 
 
   return (
     <div className="bg-white rounded-xl shadow-md p-6">
-      <h3 className="text-lg font-bold mb-4">预测概率分布</h3>
+      <h3 className="text-lg font-bold mb-1">胜平负概率分布</h3>
+      <p className="text-xs text-gray-400 mb-4">预测比赛结果类型（主胜/平局/客胜）</p>
       <div className="h-64">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>

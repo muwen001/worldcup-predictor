@@ -102,7 +102,7 @@ export interface AppState {
   matches: Match[];
   predictions: PredictionRecord[];
   selectedMatchId: string | null;
-  expandedMatchId: string | null;
+  teamRatings: Record<string, number>;
   isLoading: boolean;
   lastUpdated: string;
   sourceStatus: DataSourceStatus[];
@@ -117,8 +117,8 @@ export type AppAction =
   | { type: 'SET_SELECTED_MATCH'; payload: string | null }
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'UPDATE_ODDS'; payload: { matchId: string; odds: Odds[] } }
-  | { type: 'SET_EXPANDED_MATCH'; payload: string | null }
   | { type: 'SET_LAST_UPDATED'; payload: string }
   | { type: 'SET_SOURCE_STATUS'; payload: DataSourceStatus[] }
   | { type: 'SET_DATA_ERRORS'; payload: string[] }
-  | { type: 'SET_REAL_TIME'; payload: boolean };
+  | { type: 'SET_REAL_TIME'; payload: boolean }
+  | { type: 'SET_TEAM_RATINGS'; payload: Record<string, number> };

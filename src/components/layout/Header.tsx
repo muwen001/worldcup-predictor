@@ -1,12 +1,10 @@
 import React from 'react';
 import { Trophy, RefreshCw, Clock, Wifi, WifiOff, AlertCircle, Database } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { hasAnyApiKey } from '../../services/apiConfig';
 
 export const Header: React.FC = () => {
   const { refreshData, state } = useApp();
 
-  const isApiConfigured = hasAnyApiKey();
   const hasErrors = state.dataErrors.length > 0;
   const activeSources = state.sourceStatus.filter(s => s.connected && s.lastFetch);
   const staticOnly = !state.isRealTime && activeSources.some(s => s.source === 'static-cache');
@@ -65,21 +63,6 @@ export const Header: React.FC = () => {
             </button>
           </div>
         </div>
-
-        {/* API配置提示 */}
-        {!isApiConfigured && (
-          <div className="mt-3 px-4 py-2 bg-yellow-900/50 border border-yellow-600/50 rounded-lg text-sm text-yellow-200 flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 flex-shrink-0" />
-            <div>
-              <span className="font-medium">未配置实时API：</span>
-              当前使用静态数据（基于FIFA排名的推算赔率）。
-              配置API密钥以获取实时赔率和比分：
-              <span className="font-mono bg-black/30 px-1.5 py-0.5 rounded ml-1">.env</span>
-              文件或 localStorage。详见
-              <span className="font-mono bg-black/30 px-1.5 py-0.5 rounded ml-1">.env.example</span>
-            </div>
-          </div>
-        )}
 
         {/* 数据源详情 */}
         {activeSources.length > 0 && (

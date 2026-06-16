@@ -24,12 +24,19 @@ const DEFAULT_CONFIG: ApiConfig = {
 
 const CONFIG_STORAGE_KEY = 'wc2026_api_config';
 
+function isPlaceholderValue(value: string | undefined): boolean {
+  if (!value) return true;
+  // 过滤 .env.example 中的占位符，如 your_football_data_api_key_here
+  if (value.startsWith('your_') && value.endsWith('_here')) return true;
+  return false;
+}
+
 function getEnvConfig(): Partial<ApiConfig> {
   if (typeof import.meta === 'undefined' || !import.meta.env) return {};
   return {
-    footballDataApiKey: import.meta.env.VITE_FOOTBALL_DATA_API_KEY || null,
-    oddsApiKey: import.meta.env.VITE_ODDS_API_KEY || null,
-    apiFootballKey: import.meta.env.VITE_API_FOOTBALL_KEY || null,
+    footballDataApiKey: isPlaceholderValue(import.meta.env.VITE_FOOTBALL_DATA_API_KEY) ? null : import.meta.env.VITE_FOOTBALL_DATA_API_KEY,
+    oddsApiKey: isPlaceholderValue(import.meta.env.VITE_ODDS_API_KEY) ? null : import.meta.env.VITE_ODDS_API_KEY,
+    apiFootballKey: isPlaceholderValue(import.meta.env.VITE_API_FOOTBALL_KEY) ? null : import.meta.env.VITE_API_FOOTBALL_KEY,
     enablePolling: import.meta.env.VITE_ENABLE_POLLING !== 'false',
     pollingInterval: parseInt(import.meta.env.VITE_POLLING_INTERVAL || '300000', 10),
     cacheTtl: parseInt(import.meta.env.VITE_CACHE_TTL || '600000', 10),
@@ -124,6 +131,7 @@ export interface DataSourceStatus {
 
 export function getDefaultSourceStatus(): DataSourceStatus[] {
   return [
+    { source: 'cctv-sports', connected: false, lastFetch: null, error: null, matchesAvailable: false, oddsAvailable: false },
     { source: 'football-data.org', connected: false, lastFetch: null, error: null, matchesAvailable: false, oddsAvailable: false },
     { source: 'the-odds-api', connected: false, lastFetch: null, error: null, matchesAvailable: false, oddsAvailable: false },
     { source: 'api-football', connected: false, lastFetch: null, error: null, matchesAvailable: false, oddsAvailable: false },

@@ -19,12 +19,3 @@ export function usePrediction(matchId: string | null) {
   const { state } = useApp();
   return state.predictions.find((p) => p.matchId === matchId) || null;
 }
-
-export function useExpandedMatch() {
-  const { state, dispatch } = useApp();
-  return {
-    expandedMatchId: state.expandedMatchId,
-    toggleExpanded: (id: string) =>
-      dispatch({ type: 'SET_EXPANDED_MATCH', payload: state.expandedMatchId === id ? null : id }),
-  };
-}

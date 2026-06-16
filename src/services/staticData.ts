@@ -86,21 +86,26 @@ const BOOKMAKERS = [
   { source: 'betfair', sourceName: 'Betfair' },
 ];
 
-// 基于FIFA排名的确定性赔率计算（无随机）
-// 排名差越大，强队赔率越低
+// 基于FIFA排名的非线性赔率计算（无随机）
+// 排名差越大，强队赔率越低。使用非线性映射：小差距时影响小，大差距时影响加速
 function calculateDeterministicOdds(homeRank: number, awayRank: number, bookmakerIndex: number): { homeWin: number; draw: number; awayWin: number } {
   const rankDiff = awayRank - homeRank; // 正数 = 主队排名更高（数字更小=更强）
   
-  // 基础赔率计算
-  const baseHome = 2.0 - Math.min(rankDiff * 0.03, 1.2);
-  const baseAway = 2.0 + Math.max(rankDiff * 0.03, -1.2);
-  const baseDraw = 3.2 - Math.abs(rankDiff) * 0.01;
+  // 非线性映射：使用平方根函数，使排名差的影响更符合实际
+  // 排名差1-5影响很小，排名差50+影响显著
+  const sign = rankDiff >= 0 ? 1 : -1;
+  const nonLinearDiff = sign * Math.pow(Math.abs(rankDiff) / 10, 0.75) * 10;
+  
+  // 基础赔率计算（非线性）
+  const baseHome = 2.0 - Math.min(nonLinearDiff * 0.04, 1.3);
+  const baseAway = 2.0 + Math.max(nonLinearDiff * 0.04, -1.3);
+  const baseDraw = 2.6 - Math.abs(nonLinearDiff) * 0.003; // 进一步提升平局概率
   
   // 不同博彩公司有微小差异（基于索引而非随机）
   const bmOffset = (bookmakerIndex - 1) * 0.15; // -0.15, 0, +0.15
-  const homeWin = Math.max(1.1, baseHome + bmOffset);
-  const awayWin = Math.max(1.1, baseAway - bmOffset);
-  const draw = Math.max(2.5, baseDraw + bmOffset * 0.5);
+  const homeWin = Math.max(1.05, baseHome + bmOffset);
+  const awayWin = Math.max(1.05, baseAway - bmOffset);
+  const draw = Math.max(2.0, baseDraw + bmOffset * 0.5);
   
   return {
     homeWin: Math.round(homeWin * 100) / 100,
@@ -342,7 +347,7 @@ function getKnockoutMatches(): Match[] {
     m.push(ko(`k${String(idx + 1).padStart(2, '0')}`, date, time, 'round_of_32', h, a));
   });
 
-  const r32w = r32.map(([_, __, h, a]) => win(h, a));
+  const r32w = r32.map(([, , h, a]) => win(h, a));
 
   // --- ROUND OF 16 ---
   const r16 = [
@@ -360,7 +365,7 @@ function getKnockoutMatches(): Match[] {
     m.push(ko(`k${String(idx + 17).padStart(2, '0')}`, date, time, 'round_of_16', h, a));
   });
 
-  const r16w = r16.map(([_, __, h, a]) => win(h, a));
+  const r16w = r16.map(([, , h, a]) => win(h, a));
 
   // --- QUARTERFINALS ---
   const qf = [
@@ -374,7 +379,7 @@ function getKnockoutMatches(): Match[] {
     m.push(ko(`k${String(idx + 25).padStart(2, '0')}`, date, time, 'quarter', h, a));
   });
 
-  const qfw = qf.map(([_, __, h, a]) => win(h, a));
+  const qfw = qf.map(([, , h, a]) => win(h, a));
 
   // --- SEMIFINALS ---
   const sf = [
@@ -386,8 +391,8 @@ function getKnockoutMatches(): Match[] {
     m.push(ko(`k${String(idx + 29).padStart(2, '0')}`, date, time, 'semi', h, a));
   });
 
-  const sfw = sf.map(([_, __, h, a]) => win(h, a));
-  const sfl = sf.map(([_, __, h, a]) => (win(h, a) === h ? a : h));
+  const sfw = sf.map(([, , h, a]) => win(h, a));
+  const sfl = sf.map(([, , h, a]) => (win(h, a) === h ? a : h));
 
   // --- 3RD PLACE ---
   m.push(ko('k31', '2026-07-18', '17:00', 'quarter', sfl[0], sfl[1]));
@@ -401,13 +406,17 @@ function getKnockoutMatches(): Match[] {
 // =============================================================================
 // EXPORT: All 104 matches sorted by date
 // =============================================================================
+let allMatchesCache: Match[] | null = null;
+
 export function getAllMatches(): Match[] {
+  if (allMatchesCache) return allMatchesCache;
   const allMatches = [...getGroupMatches(), ...getKnockoutMatches()];
   allMatches.sort((a, b) => {
     const dtA = new Date(a.date + 'T' + a.time + 'Z');
     const dtB = new Date(b.date + 'T' + b.time + 'Z');
     return dtA.getTime() - dtB.getTime();
   });
+  allMatchesCache = allMatches;
   return allMatches;
 }
 
@@ -422,26 +431,84 @@ export function getMatchStatus(match: Match, now: Date): Match['status'] {
   return 'upcoming';
 }
 
-// 确定性比赛结果模拟（基于排名和统计，非随机）
-// 仅在比赛已完成但未配置真实结果时使用
+// 确定性比赛结果模拟：先决定胜负，再决定比分
+// 参考世界杯小组赛真实分布：强队胜约48%、平局约26%、弱队胜约26%
+function deterministicHash(a: number, b: number, c: number): number {
+  let h = ((a * 2654435761) ^ (b * 340573321) ^ (c * 2246822519)) & 0xFFFFFFFF;
+  h = ((h >> 16) ^ h) * 0x45d9f3b & 0xFFFFFFFF;
+  h = ((h >> 16) ^ h) * 0x45d9f3b & 0xFFFFFFFF;
+  h = (h >> 16) ^ h;
+  return (h & 0xFFFF) / 0xFFFF;
+}
+
 function calculateDeterministicResult(match: Match): { result: MatchResult; score: { home: number; away: number } } {
-  const rankDiff = match.awayTeam.fifaRank - match.homeTeam.fifaRank;
-  const attackDiff = match.homeTeam.stats.attackRating - match.awayTeam.stats.attackRating;
-  const defenseDiff = match.homeTeam.stats.defenseRating - match.awayTeam.stats.defenseRating;
-  
-  // 使用排名差和攻防差计算预期进球
-  const homeXg = 1.4 + Math.max(0, rankDiff * 0.02) + Math.max(0, attackDiff * 0.01) + Math.max(0, defenseDiff * 0.005);
-  const awayXg = 1.1 + Math.max(0, -rankDiff * 0.02) + Math.max(0, -attackDiff * 0.01) + Math.max(0, -defenseDiff * 0.005);
-  
-  // 确定性取整（使用floor）
-  let homeScore = Math.floor(homeXg);
-  let awayScore = Math.floor(awayXg);
-  
-  // 确保至少有0-0可能
+  const homeRank = match.homeTeam.fifaRank;
+  const awayRank = match.awayTeam.fifaRank;
+  const rankDiff = awayRank - homeRank; // 正=主队更强
+  const absRankDiff = Math.abs(rankDiff);
+  const avgRank = (homeRank + awayRank) / 2; // 平均排名反映比赛级别
+
+  // === Step 1: 决定胜负结果 ===
+  const outcomeHash = deterministicHash(homeRank, awayRank, 0);
+
+  // 综合排名差距和绝对排名的胜负概率模型
+  // 两队都是强队(rank<30)时，差距影响小（强强对话更难预测）
+  // 两队都是弱队时，差距影响大（弱弱对话更容易分胜负）
+  const isTopMatch = avgRank < 25; // 强强对话
+  const isMidMatch = avgRank >= 25 && avgRank < 50; // 中等对决
+  // isWeakMatch = avgRank >= 50
+
+  // 排名差对胜负的影响：强强对话时降低，弱弱对话时提升
+  const rankImpact = isTopMatch ? absRankDiff * 0.003 : (isMidMatch ? absRankDiff * 0.005 : absRankDiff * 0.007);
+  const nonlinearBoost = Math.pow(absRankDiff / 30, 0.6) * 0.12;
+
+  const strongWinProb = Math.min(0.75, 0.38 + rankImpact + (isTopMatch ? 0 : nonlinearBoost));
+  const drawProb = Math.max(0.15, 0.28 - absRankDiff * 0.002 + (isTopMatch ? 0.05 : 0)); // 强强对话更易平局
+
+  let result: MatchResult;
+  if (rankDiff > 0) {
+    if (outcomeHash < strongWinProb) result = 'home';
+    else if (outcomeHash < strongWinProb + drawProb) result = 'draw';
+    else result = 'away';
+  } else {
+    if (outcomeHash < strongWinProb) result = 'away';
+    else if (outcomeHash < strongWinProb + drawProb) result = 'draw';
+    else result = 'home';
+  }
+
+  // === Step 2: 根据胜负结果分配比分 ===
+  const scoreHash = deterministicHash(homeRank, awayRank, 1);
+  const homeAtk = match.homeTeam.stats.attackRating;
+  const awayAtk = match.awayTeam.stats.attackRating;
+  const homeDef = match.homeTeam.stats.defenseRating;
+  const awayDef = match.awayTeam.stats.defenseRating;
+
+  const strongerAtk = rankDiff > 0 ? homeAtk : awayAtk;
+  const weakerDef = rankDiff > 0 ? awayDef : homeDef;
+  const avgGoalsBase = 1.2 + (strongerAtk / 100) * 0.5 + (1 - weakerDef / 200) * 0.3;
+
+  let homeScore: number, awayScore: number;
+
+  if (result === 'draw') {
+    if (scoreHash < 0.30) { homeScore = 0; awayScore = 0; }
+    else if (scoreHash < 0.85) { homeScore = 1; awayScore = 1; }
+    else { homeScore = 2; awayScore = 2; }
+  } else {
+    const winnerIsHome = result === 'home';
+    const winnerGoals = Math.round(avgGoalsBase);
+
+    const loserGoalProb = absRankDiff > 40 ? 0.15 : (absRankDiff > 20 ? 0.35 : 0.50);
+    const loserGoals = scoreHash < loserGoalProb ? 1 : 0;
+
+    const extraGoalHash = deterministicHash(homeRank, awayRank, 2);
+    const adjustedWinnerGoals = winnerGoals + (extraGoalHash < 0.20 && strongerAtk > 80 ? 1 : 0);
+
+    homeScore = winnerIsHome ? Math.min(5, adjustedWinnerGoals) : Math.min(5, loserGoals);
+    awayScore = winnerIsHome ? Math.min(5, loserGoals) : Math.min(5, adjustedWinnerGoals);
+  }
+
   homeScore = Math.max(0, Math.min(5, homeScore));
   awayScore = Math.max(0, Math.min(5, awayScore));
-  
-  const result: MatchResult = homeScore > awayScore ? 'home' : homeScore < awayScore ? 'away' : 'draw';
 
   return { result, score: { home: homeScore, away: awayScore } };
 }
@@ -476,14 +543,14 @@ export function simulateOddsUpdate(match: Match): Match {
     
     return {
       ...odds,
-      homeWin: Math.max(1.01, newHome),
-      draw: Math.max(1.01, newDraw),
-      awayWin: Math.max(1.01, newAway),
+      homeWin: Math.max(1.05, newHome),
+      draw: Math.max(1.05, newDraw),
+      awayWin: Math.max(1.05, newAway),
       timestamp: newTimestamp,
       history: [...odds.history.slice(1), {
-        homeWin: Math.max(1.01, newHome),
-        draw: Math.max(1.01, newDraw),
-        awayWin: Math.max(1.01, newAway),
+        homeWin: Math.max(1.05, newHome),
+        draw: Math.max(1.05, newDraw),
+        awayWin: Math.max(1.05, newAway),
         timestamp: newTimestamp,
       }],
     };

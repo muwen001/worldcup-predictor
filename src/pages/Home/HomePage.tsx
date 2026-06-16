@@ -100,6 +100,29 @@ export const HomePage: React.FC = () => {
       {recentFinished.length > 0 && (
         <div>
           <h2 className="text-xl font-bold mb-4">最近赛果</h2>
+          {/* 简要比分列表 */}
+          <div className="bg-white rounded-xl shadow-md p-4 mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {recentFinished.map((match) => (
+                <div key={match.id} className="flex items-center justify-between p-2 rounded-lg bg-gray-50">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">{match.homeTeam.flag}</span>
+                    <span className="font-medium text-sm">{match.homeTeam.nameCn}</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-lg font-bold text-primary">{match.score?.home}</span>
+                    <span className="text-sm text-gray-400">:</span>
+                    <span className="text-lg font-bold text-primary">{match.score?.away}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-sm">{match.awayTeam.nameCn}</span>
+                    <span className="text-xl">{match.awayTeam.flag}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* 详细卡片 */}
           <div className="grid grid-cols-1 gap-4">
             {recentFinished.map((match) => (
               <MatchCard

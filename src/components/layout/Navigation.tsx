@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, CalendarDays, Shield, History } from 'lucide-react';
+import { CalendarDays, Shield, History } from 'lucide-react';
 
 interface NavItem {
   id: string;
@@ -8,7 +8,6 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { id: 'home', label: '首页', icon: <Home className="w-5 h-5" /> },
   { id: 'matches', label: '比赛', icon: <CalendarDays className="w-5 h-5" /> },
   { id: 'teams', label: '球队', icon: <Shield className="w-5 h-5" /> },
   { id: 'history', label: '历史', icon: <History className="w-5 h-5" /> },
